@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 class Stream:
     
     G = 6.67408e-11
-    nump = 10
+    nump = 50
     psi0 = np.linspace(-5,5,nump)
     
     def __init__(self,mass,rstream,rsub,impact,strvel,subvel,t):
@@ -16,14 +16,16 @@ class Stream:
         self.wvec = subvel    # Relative velocity of the halo
         self.t = t    # Time elapsed after the halo impacted the stream
 
+        # Calculate the different components of the subhalo relative velocity
         self.wperp = np.sqrt(subvel[0]**2 + subvel[2]**2)
         self.wpar = v[1] - wvec[1]
         self.w = np.sqrt(subvel[0]**2 + subvel[2]**2 + (v[1] - wvec[1])**2)
+
         
-        self.calc_dv()
-        self.calc_psi_rho()
-        self.calc_dx()
-        self.calc_dxdot()
+        self.calc_dv()      # Calculates the change in initial velocity as a function of angle
+        self.calc_psi_rho()     # Calculates the change in angle as a function of time and the change in density
+        self.calc_dx()      # Calculates the perturbations in the x and z direction of the stream
+        self.calc_dxdot()   # Calculates the change in the stream velocity as a function of time and angle
 
 
     '''
@@ -33,10 +35,12 @@ class Stream:
 
     def d2rphi(self):
         r0 = self.r0
-        m = self.m
-        rs = self.rs
 
-        phideriv = -self.G*m*((2.*rs+3.*r0)/(r0**2*(rs+r0)**2)-2.*np.log(1.+r0/rs)/r0**3)
+        # These are the mass and radius associated with the NFW potential
+        M = 1.99e42
+        Rs = 4.32e20
+
+        phideriv = -self.G*M*((2.*Rs+3.*r0)/(r0**2*(Rs+r0)**2)-2.*np.log(1.+r0/Rs)/r0**3)
 
         return phideriv
         
@@ -133,23 +137,30 @@ class Stream:
 if __name__ == "__main__":
 
 
-    M = 10.**7
-    r0 = 3.08567758e16
+    m = 1.99e37
+    r0 = 3.024e20
     b = 0.
-    v = [0.,200.,0.]
-    wvec = [100.,0.,0.]
-    rs = 0.625*r0
-    time = 450.e6
+    v = [0.,168200.,0.]
+    wvec = [0.,0.,150000.]
+    rs = 1.92855e19
+    time = 1.419e16
 
-    stream1 = Stream(M,r0,rs,b,v,wvec,time)
+    stream1 = Stream(m,r0,rs,b,v,wvec,time)
 
-    print stream1.rho
+    gam = stream1.gamma()
+    print 'rho: ', stream1.rho
+    print 'gamma: ', gam
+    print 'gamma: ', (4.-gam**2)/gam**2
+    print 'd2rphi: ', stream1.d2rphi()
     dx = stream1.dx
     psi = stream1.psi
-
+    
     plt.figure()
 
-    plt.plot(psi,dx[0])
-    plt.plot(psi,dx[2])
+    plt.plot(psi,stream1.dxdot[0])
+    plt.plot(psi,stream1.dxdot[2])
+#    plt.plot(psi,dx[0])
+#    plt.plot(psi,dx[2])
     plt.show()
+    
     
