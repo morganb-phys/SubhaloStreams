@@ -125,8 +125,8 @@ class Stream:
 
         self.dxdot = deltaxdot
 
-def GenData(x,y,dy)
-    data = [(numpy.random.normal(y[i],dy[i]) for i in range(len(y))]
+#def GenData(x,y,dy)
+#    data = [(numpy.random.normal(y[i],dy[i]) for i in range(len(y))]
 
 
 if __name__ == "__main__":
@@ -164,7 +164,6 @@ if __name__ == "__main__":
     ax5.set_ylim([-3,3])
     ax5.set_ylabel(r'$\Delta \dot z$')
     ax6.plot(psi,stream1.rho)
-#    ax6.set_ylim([0.,0.05])
     ax6.set_ylabel(r'$\rho$')
 
     plt.figure()
