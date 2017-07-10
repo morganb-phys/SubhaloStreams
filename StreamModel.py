@@ -245,7 +245,7 @@ def Erkalplot(stream):
     ax6.set_xlabel(r'$\Psi (^\circ)$')
  #   ax6.set_yticks([0.4,0.8,1.2])
 
-    mass = '%.1e' % stream.m
+    mass = '%.0e' % stream.m
     filename = 'M_'+mass+'.png'
     f.savefig(filename)
     print 'Saving to: ', filename
