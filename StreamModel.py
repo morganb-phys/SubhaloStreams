@@ -37,13 +37,16 @@ class Stream:
         Calculated parameters:
             wperp (km/s) - Perpendicular component of the relative velocity to points in the stream
             wpar (km/s) - Parallel component of relative velocity 
-            w - Total magnitude of relative velocity between the subhalo and points in the stream
+            w (km/s) - Total magnitude of relative velocity between the subha and points in the stream
 
-            gamma - 
+            dv (km/s) - Calcultes the initial kick to velocity as a function of angle. Not time dependent.
+            psi (radians) - Calculates the new angles to stars after a time, t.
+            rho - Calculates the density of the stream after a time, t.
+            dx (dx[0] (pc), dx[2] (radians)) - Change to position of stars in the stream after a time, t.
+            dxdot (km/s) - Change in velocity of stars in the stream after a time, t.
             
-    gT - calculates a very commonly used angle
-    calc_dv - 
-    
+            gT (radians) - calculates a very commonly used angle in several functions
+            gamma - 
     '''
     def __init__(self,mass,rstream,rsub,impact,subvel,t):
         self.m = mass   
@@ -54,16 +57,15 @@ class Stream:
         self.t = t*1.02 # Myr*1.02(pc/(km/s)/Myr) - converts to time in units pc/(km/s)
         self.vy = self.nfwp.vcirc(self.r0/10000.)*168.2 
 
-        # Calculate the different components of the subhalo relative velocity
         self.wperp = np.sqrt(subvel[0]**2 + subvel[2]**2)
-        self.wpar = self.vy - wvec[1]
-        self.w = np.sqrt(subvel[0]**2 + subvel[2]**2 + (self.vy - wvec[1])**2)
+        self.wpar = self.vy - subvel[1]
+        self.w = np.sqrt(subvel[0]**2 + subvel[2]**2 + (self.vy - subvel[1])**2)
 
         self.gamma = self.calc_gamma()
-        self.dv = self.calc_dv(self.psi0)     # Calculates the change in initial velocity as a function of angle       
-        self.psi,self.rho = self.calc_psi_rho(self.psi0)     # Calculates the change in angle as a function of time and the change in density
-        self.dx = self.calc_dx(self.psi0)      # Calculates the perturbations in the x and z direction of the stream
-        self.dxdot = self.calc_dxdot(self.psi0)   # Calculates the change in the stream velocity as a function of time and angle
+        self.dv = self.calc_dv(self.psi0)            
+        self.psi,self.rho = self.calc_psi_rho(self.psi0)
+        self.dx = self.calc_dx(self.psi0) 
+        self.dxdot = self.calc_dxdot(self.psi0) 
 
         
     def gT(self):
@@ -152,35 +154,24 @@ class Stream:
         return deltaxdot
 
 
-def GenData(stream,nstars):
+def GenData(stream,nstars,std):
 
-    #Method 1 to calculate CDF
-    cdf = [simps(stream.rho[:i],stream.psi0[:i]) for i in range(1,len(stream.psi))]
-    #Method 2 to calculate CDF
-    rhopdf = stream.rho/sum(stream.rho)
-    rhocdf = (np.cumsum(rhopdf) - np.min(np.cumsum(rhopdf)))
-    rhocdf = rhocdf/np.max(rhocdf)
+    dxstd = std[0]
+    dxdotstd = std[1]
+   #generate random number between (0,1] with uniform distribution
+    psi0 = np.random.uniform(stream.psi0[int(stream.nump*0.1)],stream.psi0[-int(stream.nump*0.1+1)],size=nstars)
 
+    print stream.nump*0.01
+    print stream.psi0[int(stream.nump*0.01)],stream.psi0[-int(stream.nump*0.01+1)]
     
-    #Plot the two CDF's which are NOT the same
-    plt.figure()
-    plt.plot(stream.psi[:999]*180./np.pi,cdf/np.max(cdf))
-    plt.plot(stream.psi*180./np.pi,rhocdf)
-    
-    #generate random number between (0,1] with uniform distribution
-    rand = np.random.uniform(size=nstars)
-
-    #map to psi0
-    f = interp1d(rhocdf,stream1.psi0)
-    psi0 = f(rand)
-                
+    #Calculate stream parameters with the new psi0               
     datapsi, datarho = stream.calc_psi_rho(psi0)     
     datadx = stream.calc_dx(psi0)      
     datadxdot = stream.calc_dxdot(psi0) 
+
+    print np.min(datapsi), np.max(datapsi)
     
     #add noise to the variables
-    dxstd = [10.,0.,0.02*np.pi/180.]
-    dxdotstd = [0.3,0.15,0.1]
     noisedx = np.zeros([3,nstars])
     noisedxdot = np.zeros([3,nstars])
 
@@ -192,14 +183,8 @@ def GenData(stream,nstars):
     datadx = datadx + noisedx
     datadxdot = datadxdot + noisedxdot
 
-    nbins = 50
-    rho,edges = np.histogram(datapsi*180./np.pi,nbins,density=True)
-    middle = np.zeros(nbins)
-    for i in range(nbins):
-        middle[i] = (edges[i]+edges[i+1])/2.
-
-    return datapsi,datadx,datadxdot,[rho,middle]
-
+    return datapsi,datadx,datadxdot
+    
 def Erkalplot(stream):
 
     dx = stream.dx
@@ -208,9 +193,20 @@ def Erkalplot(stream):
     psi0 = stream.psi0*180./np.pi
     dv = stream.dv
     rho = stream.rho/simps(stream.rho,psi)
-    
-    psidata,dxdata,dxdotdata,rhodata = GenData(stream,10000)
+
+    dxstd = [10.,0.,0.02*np.pi/180.]
+    dxdotstd = [0.3,0.15,0.1]
+
+    psidata,dxdata,dxdotdata = GenData(stream,100000,[dxstd,dxdotstd])
     psidata = psidata*180./np.pi
+
+    print np.min(psidata), np.min(psi)
+
+    nbins = 50
+    rhodata,edges = np.histogram(psidata,nbins,density=True)
+    middle = np.zeros(nbins)
+    for i in range(nbins):
+        middle[i] = (edges[i]+edges[i+1])/2.
 
     f, (ax1, ax2, ax3, ax4, ax5, ax6) = plt.subplots(6, 1, sharex='col', sharey='row')
     ax1.plot(psidata,dxdata[0]/1000.,'.',c='grey')
@@ -219,31 +215,36 @@ def Erkalplot(stream):
     ax1.set_ylim([-0.1,0.1])
     ax1.set_yticks([-0.1,0.,0.1])
     ax1.set_ylabel(r'$\Delta x\,\,(kpc)$')
+    
     ax2.plot(psidata,dxdata[2]*180./np.pi,'.',c='grey')
     ax2.plot(psi,dx[2]*180./np.pi,'k-')
     ax2.set_ylim([-1.2,1.2])
     ax2.set_ylabel(r'$\delta_z\,\,(^\circ)$')
     ax2.set_yticks([-1,0.,1])
+    
     ax3.plot(psidata,dxdotdata[0],'.',c='grey')
     ax3.plot(psi,dxdot[0],'k-')
     ax3.set_ylim([-3.2,3.2])
     ax3.set_ylabel(r'$\Delta v_x$')
     ax3.set_yticks([-3,0.,3])
+    
     ax4.plot(psidata,dxdotdata[1],'.',c='grey')
     ax4.plot(psi,dxdot[1],'k-')
     ax4.set_ylim([-3.2,3.2])
     ax4.set_ylabel(r'$\Delta v_y$')
     ax4.set_yticks([-3,0.,3])
+    
     ax5.plot(psidata,dxdotdata[2],'.',c='grey')
     ax5.plot(psi,dxdot[2],'k-')
     ax5.set_ylim([-3.2,3.2])
     ax5.set_ylabel(r'$\Delta v_z$')
     ax5.set_yticks([-3,0.,3])
-    ax6.plot(rhodata[1],rhodata[0],'.',c='grey')
+    
+    ax6.plot(middle,rhodata,'.',c='grey')
     ax6.plot(psi,rho,'k-')
     ax6.set_ylabel(r'$\rho$')
     ax6.set_xlabel(r'$\Psi (^\circ)$')
- #   ax6.set_yticks([0.4,0.8,1.2])
+    ax6.set_yticks([0.005,0.01,0.03])
 
     mass = '%.0e' % stream.m
     filename = 'M_'+mass+'.png'
@@ -263,6 +264,9 @@ if __name__ == "__main__":
 
     stream1 = Stream(m,r0,rs,b,wvec,time)
     stream2 = Stream(1.e7,r0,250.,b,wvec,time)
+
+#    GenData(stream1,1000000)
+#    GenData(stream2,1000000)
 
     Erkalplot(stream1)
     Erkalplot(stream2)
